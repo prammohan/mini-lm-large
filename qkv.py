@@ -145,7 +145,7 @@ if __name__ == "__main__":
         
         for batch_x, batch_y in loader:
 
-            batch = batch_x.to(device)
+            batch_x = batch_x.to(device)
             targets_batch = batch_y.to(device)
             
             # Forward Pass
