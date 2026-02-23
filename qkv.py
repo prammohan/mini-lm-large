@@ -104,7 +104,9 @@ if __name__ == "__main__":
     start = time.time()
     embedding_dimension = 64
     attn = Attention(embedding_dimension)
+    attn = attn.to(device)
     ffn = FFN(embedding_dimension, hidden_dim=256)
+    ffn = ffn.to(device)
 
     #print(f"Q, K, V initialized to: {attn.qkv.W_q, attn.qkv.W_k, attn.qkv.W_v}")
     
@@ -116,6 +118,7 @@ if __name__ == "__main__":
     size = t.vocab_size(text)
 
     head = Head(embedding_dimension, size)
+    head = head.to(device)
 
     sequence_length = 16
     d = Dataset(tokens, sequence_length)
@@ -174,11 +177,11 @@ if __name__ == "__main__":
                 prof.__enter__()
             
             with record_function("attention"):
-                attn_outputs = attn(input_vectors).to(device)
+                attn_outputs = attn(input_vectors)
             with record_function("ffn"):
-                ffn_outputs = ffn(attn_outputs).to(device)
+                ffn_outputs = ffn(attn_outputs)
             with record_function("head"):
-                logits = head(ffn_outputs).to(device)
+                logits = head(ffn_outputs)
 
             logits_flat = logits.view(-1, size) #keeps the vocab size but collapses the batch and seq len dimension
             targets_flat = targets_batch.view(-1) #(bs, seq_len)
