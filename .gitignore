@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pt
+data/
+trace.json
+model_graph*
