@@ -124,6 +124,8 @@ if __name__ == "__main__":
     
     embedding_dimension = 64
     e = Embedding(size, embedding_dimension)
+    e = e.to(device)
+
     # Collect all learnable parameters
     params = (
         list(e.parameters()) +
@@ -150,7 +152,7 @@ if __name__ == "__main__":
             
             # Forward Pass
             with record_function("embedding"):
-                input_vectors = e(batch_x).to(device)
+                input_vectors = e(batch_x)
             
             #if (first_iteration == True):
                 #print(f"batchx shape is {batch_x.shape}")
