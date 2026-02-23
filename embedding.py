@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from reader import read_file
+from torch.utils.data import DataLoader
+from reader import read_file, read_wikitext
 from tokenizer import Tokenizer
 from dataset import Dataset
 
@@ -15,28 +16,28 @@ class Embedding(nn.Module):
         return self.embedding(tokenid)
     
 if __name__ == "__main__":
-    #e = Embedding(65, 64)
-    #print (f"Embedding is {e}")
-    content = read_file("example.txt")
+    content = read_wikitext()
     t = Tokenizer(content)
     tokens = t.encode(content)
     text = t.decode(tokens)
     size = t.vocab_size(text)
     sequence_length = 16
     d = Dataset(tokens, sequence_length)
-    training_set = d.make_ngrams()    
-    training_examples = d.get_examples()
-    input_shape, target_shape = d.get_shape(training_examples)
-    print(f"Input shape is: {input_shape}")
-    print(f"Target shape is: {target_shape}")
-    inputs  = [x for x, y in training_examples]
-    targets = [y for x, y in training_examples]
+    loader = DataLoader(d, batch_size=32, shuffle=True)
+    
+    first_iteration = True;
     embedding_dimension = 64
     e = Embedding(size, embedding_dimension)
-    input_tensors = torch.tensor(inputs)
-    input_vectors = e(input_tensors)
-    print (f"Embedding is {input_vectors.shape}")
-    for i in range(3):
-        print(f"Token {i} (ID={input_tensors[0, i].item()}): {input_vectors[0, i][:8]}...")
-    
-
+    for batch_x, batch_y in loader:
+        input_vectors = e(batch_x)
+        
+        if (first_iteration == True):
+            print(f"batchx shape is {batch_x.shape}")
+            print(f"Number of examples: {len(batch_x)}")
+            print(f"Each input length:  {len(batch_x[0])}")
+            print(f"Each target length: {len(batch_x[0])}")
+            print (f"Embedding is {input_vectors.shape}")
+            for i in range(3):
+                print(f"Token {i} (ID={input_tensors[0, i].item()}): {input_vectors[0, i][:8]}...")
+   
+        first_iteration = False;

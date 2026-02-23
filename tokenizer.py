@@ -1,4 +1,4 @@
-from reader import read_file
+from reader import read_file, read_wikitext
 class Tokenizer:
     def __init__(self, text):
         chars = sorted(set(text)) #removes duplicates then sorts so ids will be assigned to a sorted list
@@ -18,13 +18,11 @@ class Tokenizer:
         return len(set(text))
     
 if __name__ == "__main__":
-    content = read_file("example.txt")
+    content = read_wikitext()
     t = Tokenizer(content)
     tokens = t.encode(content)
     text = t.decode(tokens)
     size = t.vocab_size(text)
-    #print (tokens)
-    #print (text)
     print ("Vocab size is", size)
     print (f"Total tokens in dataset: {len(tokens):,}")
     print (f"First 10 tokens are: {tokens[:10]}")

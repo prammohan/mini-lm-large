@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 import time
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -56,7 +57,7 @@ class Attention(nn.Module):
         # Tril - refers to lower triangle of the matrix 
         # Lower triangle are ones, upper are zeroes
         # So only lower triangle is considered (upper triangle scores are ignored)
-        mask = torch.tril(torch.ones(seq_len, seq_len))
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device))
 
         # we use negative infinity as e^-inf=0 for all places where mask is zero (upper triangle)
         # if we zero e^0=1 which is still some probability
@@ -96,12 +97,16 @@ class Head(nn.Module):
 
 
 if __name__ == "__main__":
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+
     start = time.time()
     embedding_dimension = 64
     attn = Attention(embedding_dimension)
     ffn = FFN(embedding_dimension, hidden_dim=256)
 
-    print(f"Q, K, V initialized to: {attn.qkv.W_q, attn.qkv.W_k, attn.qkv.W_v}")
+    #print(f"Q, K, V initialized to: {attn.qkv.W_q, attn.qkv.W_k, attn.qkv.W_v}")
     
     
     content = read_file("example.txt")
@@ -114,23 +119,11 @@ if __name__ == "__main__":
 
     sequence_length = 16
     d = Dataset(tokens, sequence_length)
-    training_set = d.make_ngrams()    
-    training_examples = d.get_examples()
-    input_shape, target_shape = d.get_shape(training_examples)
-    print(f"Input shape is: {input_shape}")
-    print(f"Target shape is: {target_shape}")
-    inputs  = [x for x, y in training_examples]
-    targets = [y for x, y in training_examples]
+    loader = DataLoader(d, batch_size=32, shuffle=True)
     
+    
+    embedding_dimension = 64
     e = Embedding(size, embedding_dimension)
-    input_tensors = torch.tensor(inputs)
-    target_tensors = torch.tensor(targets)
-    
-    print (f"Embedding is {input_tensors.shape}")
-    print (f"Wq is {attn.qkv.W_q.shape}")
-    print (f"Wk is {attn.qkv.W_k.shape}")
-    print (f"Wv is {attn.qkv.W_v.shape}")
-
     # Collect all learnable parameters
     params = (
         list(e.parameters()) +
@@ -143,41 +136,48 @@ if __name__ == "__main__":
 
     epochs = 50
     batch_size = 32
+    do_profile = False
+    first_iteration = True;
 
     for epoch in range(epochs):
         total_loss = 0
         count = 0
-        for i in range(0, len(input_tensors), batch_size):
-            if epoch == 0 and i == 0:
-                do_profile = True
-            
-            batch = input_tensors[i : i + batch_size]
-            targets_batch = target_tensors[i : i + batch_size]
+        
+        for batch_x, batch_y in loader:
 
+            batch = batch_x.to(device)
+            targets_batch = batch_y.to(device)
+            
+            # Forward Pass
+            with record_function("embedding"):
+                input_vectors = e(batch_x).to(device)
+            
+            #if (first_iteration == True):
+                #print(f"batchx shape is {batch_x.shape}")
+                #print(f"Number of examples: {len(batch_x)}")
+                #print(f"Each input length:  {len(batch_x[0])}")
+                #print(f"Each target length: {len(batch_x[0])}")
+                #print (f"Embedding is {input_vectors.shape}")
+                #print (f"Wq is {attn.qkv.W_q.shape}")
+                #print (f"Wk is {attn.qkv.W_k.shape}")
+                #print (f"Wv is {attn.qkv.W_v.shape}")
+            
+            first_iteration = False;
+    
+            if epoch == 0 and first_iteration == True:
+                do_profile = True
+           
             if do_profile:
                 prof = profile(activities=[ProfilerActivity.CPU])
                 prof.__enter__()
-
-            # Forward Pass
-            with record_function("embedding"):
-                input_vectors = e(batch)
+            
             with record_function("attention"):
-                attn_outputs = attn(input_vectors)
+                attn_outputs = attn(input_vectors).to(device)
             with record_function("ffn"):
-                ffn_outputs = ffn(attn_outputs)
+                ffn_outputs = ffn(attn_outputs).to(device)
             with record_function("head"):
-                logits = head(ffn_outputs)
+                logits = head(ffn_outputs).to(device)
 
-            #if i == ((len(input_tensors) // batch_size) * batch_size): #last batch            
-                #print(f"Attention Outputs shape: {attn_outputs.shape}")
-                #print(attn_outputs[11])
-                #print(f"FFN Outputs shape: {ffn_outputs.shape}")
-                #print(ffn_outputs[11])
-                #print(f"Logits shape: {logits.shape}")
-                #print(logits[11])
-
-            # logits shape : (batch, 16-seq len, 65-vocab size) (not emb_dim is gone after logits step)
-            # target tensor shape : (batch, 16-seq len)
             logits_flat = logits.view(-1, size) #keeps the vocab size but collapses the batch and seq len dimension
             targets_flat = targets_batch.view(-1) #(bs, seq_len)
             
